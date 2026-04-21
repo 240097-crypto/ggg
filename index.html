@@ -2,104 +2,133 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Веб форма проекта</title>
-
+  <title>Supabase Google Auth</title>
   <style>
-    body {
-      font-family: sans-serif;
-      display: flex;
-      justify-content: center;
-      padding: 50px;
-      background-color: #f4f4f9;
-    }
-
-    .form-container {
-      background: white;
-      padding: 25px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      width: 300px;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 15px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      background: #4CAF50;
-      border: none;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-      border-radius: 5px;
-    }
-
-    button:hover {
-      background: #45a049;
-    }
+    body { font-family: Arial; max-width: 600px; margin: 40px auto; }
+    .user-line { display: flex; align-items: center; margin-bottom: 10px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; }
+    button { margin: 5px; }
   </style>
 </head>
-
 <body>
 
-<div class="form-container">
-  <h2>Форма обратной связи</h2>
+<h2 id="myInfo">Не авторизован</h2>
 
-  <form id="feedbackForm">
-    <input type="text" id="userName" placeholder="Ваше имя" required>
-    <input type="email" id="userEmail" placeholder="Ваш Email" required>
-    <button type="submit">Отправить</button>
-  </form>
-</div>
+<button onclick="login()">Войти через Google</button>
+<button onclick="logout()">Выйти</button>
+
+<hr>
+
+<input id="statusText" placeholder="Новый статус">
+<input id="statusColor" placeholder="Цвет (например red)">
+<button onclick="changeStatus()">Сохранить</button>
+
+<hr>
+
+<div id="groupList"></div>
 
 <script type="module">
-  // Импорт Firebase
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
 
-  // ВСТАВЬ СВОИ КЛЮЧИ!!!
-  const firebaseConfig = {
-    apiKey: "AIzaSyDgQnE-vuZXyqj5-tIs6Hmp7jI7hHVIn0U",
-    authDomain: "po241-c5ab0.firebaseapp.com",
-    projectId: "po241-c5ab0",
-    storageBucket: "po241-c5ab0.firebasestorage.app",
-    messagingSenderId: "487801970974",
-    appId: "1:487801970974:web:91e7956215fde16ce1290f"
-  };
+const supabase = createClient(
+  'https://ТВОЙ_PROJECT_ID.supabase.co',
+  'ТВОЙ_ANON_KEY'
+)
 
-  // Инициализация
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+let currentUser = null
 
-  // Обработка формы
-  document.getElementById("feedbackForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+// 🔐 ЛОГИН
+window.login = async () => {
+  await supabase.auth.signInWithOAuth({
+    provider: 'google'
+  })
+}
 
-    const nameInput = document.getElementById("userName").value;
-    const emailInput = document.getElementById("userEmail").value;
+// 🚪 ВЫХОД
+window.logout = async () => {
+  await supabase.auth.signOut()
+  location.reload()
+}
 
-    try {
-      await addDoc(collection(db, "requests"), {
-        name: nameInput,
-        email: emailInput,
-        timestamp: new Date()
-      });
+// 📊 ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ
+async function loadUser() {
+  const { data } = await supabase.auth.getUser()
+  currentUser = data.user
 
-      alert("Данные успешно отправлены!");
-      document.getElementById("feedbackForm").reset();
+  if (currentUser) {
+    document.getElementById('myInfo').innerText =
+      'Ты вошёл как: ' + (currentUser.user_metadata.full_name || currentUser.email)
 
-    } catch (error) {
-      console.error("Ошибка:", error);
-      alert("Ошибка при отправке!");
-    }
-  });
+    await ensureProfile()
+  } else {
+    document.getElementById('myInfo').innerText = 'Не авторизован'
+  }
+}
+
+// 🧠 СОЗДАТЬ ПРОФИЛЬ ЕСЛИ НЕТ
+async function ensureProfile() {
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser.id)
+    .single()
+
+  if (!data) {
+    await supabase.from('profiles').insert({
+      id: currentUser.id,
+      username: currentUser.user_metadata.full_name || currentUser.email,
+      status: 'Онлайн',
+      color: 'green'
+    })
+  }
+}
+
+// ✏️ ОБНОВИТЬ СТАТУС
+window.changeStatus = async () => {
+  if (!currentUser) return alert('Сначала войди')
+
+  const text = document.getElementById('statusText').value
+  const color = document.getElementById('statusColor').value
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ status: text, color: color })
+    .eq('id', currentUser.id)
+
+  if (error) {
+    console.error(error)
+    alert('Ошибка (скорее всего RLS)')
+  } else {
+    fetchGroup()
+  }
+}
+
+// 📋 СПИСОК
+async function fetchGroup() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('username', { ascending: true })
+
+  if (error) return console.error(error)
+
+  const list = document.getElementById('groupList')
+  list.innerHTML = data.map(user => `
+    <div class="user-line">
+      <div class="status-dot" style="background:${user.color || '#ccc'}"></div>
+      <div>
+        <strong>${user.username}</strong><br>
+        <small>${user.status || ''}</small>
+      </div>
+    </div>
+  `).join('')
+}
+
+// 🚀 INIT
+await loadUser()
+fetchGroup()
+setInterval(fetchGroup, 5000)
+
 </script>
-
 </body>
 </html>
