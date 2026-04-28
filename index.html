@@ -38,6 +38,28 @@
         }
         .btn-status:hover { background: var(--accent); transform: translateY(-2px); }
 
+        /* Стили для таймера */
+        .timer-display {
+            font-family: monospace;
+            font-size: 24px;
+            color: var(--accent);
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .btn-study-toggle {
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+            margin-top: 5px;
+        }
+        .btn-study-start { background: var(--online); color: white; }
+        .btn-study-stop { background: #ef4444; color: white; }
+
         .user-list { flex-grow: 1; overflow-y: auto; }
         .user-card { 
             display: flex; align-items: center; gap: 12px; padding: 12px; 
@@ -81,6 +103,12 @@
         <div class="profile-box">
             <div id="user-display-name" style="font-size: 18px; font-weight: 700;">...</div>
             <div id="user-display-status" style="font-size: 13px; color: var(--accent); margin-top: 5px;">Онлайн</div>
+            
+            <div id="timer-box">
+                <div class="timer-display" id="session-timer">00:00:00</div>
+                <button id="study-toggle-btn" class="btn-study-toggle btn-study-start" onclick="toggleStudy()">Начать учёбу</button>
+            </div>
+
             <div class="status-grid">
                 <button class="btn-status" onclick="updateStatus('📚 Учусь')">📚 Учусь</button>
                 <button class="btn-status" onclick="updateStatus('☕ Кофе')">☕ Кофе</button>
@@ -108,6 +136,7 @@
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentUser = null;
+    let studyInterval = null;
 
     async function init() {
         const { data: { session } } = await _supabase.auth.getSession();
@@ -122,6 +151,12 @@
                 username: currentUser.user_metadata.full_name || currentUser.email 
             });
 
+            // Восстановление состояния таймера при загрузке
+            const { data: profile } = await _supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (profile?.is_studying && profile.session_start) {
+                startLocalTimer(profile.session_start);
+            }
+
             refreshData();
             setInterval(refreshData, 5000);
             setInterval(async () => {
@@ -130,7 +165,53 @@
         }
     }
 
-    // ИСПРАВЛЕНО: добавлена переадресация обратно в папку /ggg/
+    // Внедренная функция таймера
+    window.toggleStudy = async () => {
+        const btn = document.getElementById('study-toggle-btn');
+        const isStarting = btn.classList.contains('btn-study-start');
+        const startTime = isStarting ? new Date().toISOString() : null;
+
+        const { error } = await _supabase.from('profiles').update({
+            is_studying: isStarting,
+            session_start: startTime,
+            status: isStarting ? '📚 Учусь' : 'Онлайн'
+        }).eq('id', currentUser.id);
+
+        if (!error) {
+            if (isStarting) {
+                startLocalTimer(startTime);
+                document.getElementById('user-display-status').innerText = '📚 Учусь';
+            } else {
+                stopLocalTimer();
+                document.getElementById('user-display-status').innerText = 'Онлайн';
+            }
+            refreshData();
+        }
+    };
+
+    function startLocalTimer(startTime) {
+        const btn = document.getElementById('study-toggle-btn');
+        btn.innerText = "Остановить";
+        btn.classList.replace('btn-study-start', 'btn-study-stop');
+        
+        clearInterval(studyInterval);
+        studyInterval = setInterval(() => {
+            const diff = Math.floor((new Date() - new Date(startTime)) / 1000);
+            const h = Math.floor(diff / 3600).toString().padStart(2, '0');
+            const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            document.getElementById('session-timer').innerText = `${h}:${m}:${s}`;
+        }, 1000);
+    }
+
+    function stopLocalTimer() {
+        const btn = document.getElementById('study-toggle-btn');
+        clearInterval(studyInterval);
+        btn.innerText = "Начать учёбу";
+        btn.classList.replace('btn-study-stop', 'btn-study-start');
+        document.getElementById('session-timer').innerText = "00:00:00";
+    }
+
     window.login = () => _supabase.auth.signInWithOAuth({ 
         provider: 'google',
         options: { redirectTo: 'https://240097-crypto.github.io/ggg/' }
@@ -139,7 +220,14 @@
     window.logout = async () => { await _supabase.auth.signOut(); location.reload(); };
 
     window.updateStatus = async (statusText) => {
-        await _supabase.from('profiles').update({ status: statusText }).eq('id', currentUser.id);
+        // Если выбираем статус вручную, останавливаем таймер если он шел (по желанию)
+        if (statusText !== '📚 Учусь') stopLocalTimer();
+        
+        await _supabase.from('profiles').update({ 
+            status: statusText,
+            is_studying: statusText === '📚 Учусь' 
+        }).eq('id', currentUser.id);
+        
         document.getElementById('user-display-status').innerText = statusText;
         refreshData();
     };
@@ -161,7 +249,22 @@
         if (users) {
             document.getElementById('user-list').innerHTML = users.map(u => {
                 const isOnline = new Date() - new Date(u.last_seen) < 70000;
-                return `<div class="user-card"><div class="dot ${isOnline ? 'active' : ''}"></div><div><div class="username">${u.username}</div><div style="font-size:12px;color:var(--accent)">${u.status || 'Онлайн'}</div></div></div>`;
+                
+                // Доп. метка если юзер учится
+                let studyTag = "";
+                if (u.is_studying && u.session_start) {
+                    const mins = Math.floor((new Date() - new Date(u.session_start)) / 60000);
+                    studyTag = ` <span style="color:var(--accent)">📖 ${mins}м</span>`;
+                }
+
+                return `
+                    <div class="user-card">
+                        <div class="dot ${isOnline ? 'active' : ''}"></div>
+                        <div>
+                            <div class="username">${u.username}${studyTag}</div>
+                            <div style="font-size:12px;color:var(--accent)">${u.status || 'Онлайн'}</div>
+                        </div>
+                    </div>`;
             }).join('');
         }
 
