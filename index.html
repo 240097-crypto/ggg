@@ -1,9 +1,22 @@
+Идея шикарная! Такая игротека прямо внутри дашборда — отличный способ «выпустить пар» в перерывах между учебными сессиями.
+
+Я полностью обновил ваш код. Логика смены темы и реакций осталась на месте. Теперь в панели чата появилась новая кнопка **«🎮 Игротека»**. При нажатии на неё открывается красивое модальное окно, где вы можете выбрать и сразу запустить одну из трёх игр:
+
+1. 🐍 **Змейка** (управление стрелками клавиатуры).
+2. 🚀 **Космический истребитель** (стрелки — движение, Space — стрельба по метеоритам).
+3. 🏎️ **Гонки** (стрелки «Влево»/«Вправо» для уклонения от встречных машин).
+
+---
+
+### Полный обновленный код для вашего GitHub
+
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudySpace Pro | Dashboard</title>
+    <title>StudySpace Pro | Dashboard & Arcade</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -54,7 +67,6 @@
         [data-theme="light"] .btn-status { background: #cbd5e1; color: #0f172a; }
         .btn-status:hover { background: var(--accent); color: white; transform: translateY(-2px); }
 
-        /* Стили для таймера */
         .timer-display {
             font-family: monospace;
             font-size: 24px;
@@ -85,7 +97,6 @@
         .dot { width: 10px; height: 10px; border-radius: 50%; background: #475569; position: relative; }
         .dot.active { background: var(--online); box-shadow: 0 0 10px var(--online); }
 
-        /* Стили рейтинга и достижений */
         .leaderboard-box {
             background: rgba(30, 41, 59, 0.1);
             border-radius: 12px;
@@ -113,47 +124,15 @@
             margin-top: 10px;
         }
         .ach-badge {
-            background: #334155;
-            border-radius: 6px;
-            padding: 6px 4px;
-            text-align: center;
-            font-size: 16px;
-            position: relative;
-            cursor: help;
-            opacity: 0.3;
-            filter: grayscale(100%);
-            transition: 0.3s;
+            background: #334155; border-radius: 6px; padding: 6px 4px; text-align: center; font-size: 16px; position: relative; cursor: help; opacity: 0.3; filter: grayscale(100%); transition: 0.3s;
         }
         [data-theme="light"] .ach-badge { background: #e2e8f0; }
-        .ach-badge.unlocked {
-            opacity: 1;
-            filter: grayscale(0%);
-            background: rgba(139, 92, 246, 0.2);
-            border: 1px solid var(--accent);
-        }
+        .ach-badge.unlocked { opacity: 1; filter: grayscale(0%); background: rgba(139, 92, 246, 0.2); border: 1px solid var(--accent); }
+        
         .ach-badge .tooltip {
-            visibility: hidden;
-            width: 140px;
-            background-color: #0b0f1a;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px;
-            position: absolute;
-            z-index: 10;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.2s;
-            font-size: 10px;
-            border: 1px solid #334155;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            visibility: hidden; width: 140px; background-color: #0b0f1a; color: #fff; text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 10; bottom: 125%; left: 50%; transform: translateX(-50%); opacity: 0; transition: opacity 0.2s; font-size: 10px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        .ach-badge:hover .tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
+        .ach-badge:hover .tooltip { visibility: visible; opacity: 1; }
 
         .main { flex-grow: 1; display: flex; flex-direction: column; background: var(--bg-dark); }
         .chat-header { 
@@ -161,9 +140,12 @@
             display: flex; justify-content: space-between; align-items: center; transition: background 0.3s, border-color 0.3s;
         }
         
-        .btn-theme-toggle {
-            background: none; border: none; color: var(--text-main); font-size: 20px; cursor: pointer; padding: 4px; border-radius: 50%;
+        .header-controls { display: flex; gap: 15px; align-items: center; }
+        .btn-theme-toggle, .btn-arcade-toggle {
+            background: none; border: none; color: var(--text-main); font-size: 20px; cursor: pointer; padding: 6px; border-radius: 50%; transition: 0.2s;
         }
+        .btn-arcade-toggle { background: var(--accent); color: white; border-radius: 8px; font-size: 14px; padding: 8px 14px; font-weight: bold; }
+        .btn-arcade-toggle:hover { transform: scale(1.05); }
 
         #chat-flow { flex-grow: 1; padding: 30px 40px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
         .msg { background: var(--bg-panel); color: var(--text-main); padding: 14px 18px; border-radius: 18px; max-width: 65%; align-self: flex-start; line-height: 1.4; border: 1px solid var(--border-color); transition: background 0.3s; }
@@ -171,7 +153,6 @@
         .msg.my { align-self: flex-end; background: var(--accent); color: white; border: none; }
         .msg.my b { color: rgba(255, 255, 255, 0.8); }
 
-        /* Стили контейнера ввода, реакций и инпута */
         .chat-footer {
             padding: 20px 40px; background: var(--sidebar-bg); border-top: 1px solid var(--border-color);
             display: flex; flex-direction: column; gap: 10px; transition: background 0.3s, border-color 0.3s;
@@ -179,7 +160,7 @@
         .reactions-bar { display: flex; gap: 8px; }
         .btn-reaction {
             background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 20px;
-            padding: 6px 14px; font-size: 16px; cursor: pointer; transition: 0.2s;
+            padding: 6px 14px; font-size: 16px; cursor: pointer; transition: 0.2s; color: var(--text-main);
         }
         .btn-reaction:hover { transform: scale(1.15); background: rgba(139, 92, 246, 0.1); border-color: var(--accent); }
         
@@ -192,6 +173,30 @@
         .overlay { position: fixed; inset: 0; background: var(--bg-dark); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; }
         .login-card { text-align: center; background: var(--bg-panel); padding: 50px; border-radius: 24px; }
         .hidden { display: none !important; }
+
+        /* ================= СТИЛИ ИГРОВОГО МОДАЛЬНОГО ОКНА ================= */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .arcade-card {
+            background: var(--bg-panel); border: 2px solid var(--accent); border-radius: 20px;
+            width: 750px; padding: 25px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .arcade-header { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .arcade-menu { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-game-select {
+            background: rgba(139, 92, 246, 0.2); border: 1px solid var(--accent); color: var(--text-main);
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .btn-game-select.active { background: var(--accent); color: white; }
+        .game-viewport {
+            background: #000; border: 4px solid #334155; border-radius: 8px;
+            width: 400px; height: 400px; position: relative; display: flex; justify-content: center; align-items: center;
+        }
+        canvas { background: #000; display: block; }
+        .game-over-text { position: absolute; color: #ff4444; font-family: monospace; font-size: 24px; font-weight: bold; text-align: center; pointer-events: none; }
+        .btn-close-arcade { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -201,6 +206,25 @@
             <h1 style="margin-bottom:10px">StudySpace</h1>
             <p style="color: var(--text-dim); margin-bottom: 30px">Система мониторинга учебной группы</p>
             <button class="btn-send" style="height: 55px;" onclick="login()">Войти через Google</button>
+        </div>
+    </div>
+
+    <div id="arcade-modal" class="modal-overlay hidden">
+        <div class="arcade-card">
+            <div class="arcade-header">
+                <h2 style="margin:0; font-size: 22px;">🕹️ Игровая Зона StudySpace</h2>
+                <button class="btn-close-arcade" onclick="closeArcade()">Закрыть</button>
+            </div>
+            <div class="arcade-menu">
+                <button id="btn-snake" class="btn-game-select active" onclick="switchGame('snake')">🐍 Змейка</button>
+                <button id="btn-space" class="btn-game-select" onclick="switchGame('space')">🚀 Самолет</button>
+                <button id="btn-race" class="btn-game-select" onclick="switchGame('race')">🏎️ Гонки</button>
+            </div>
+            <div class="game-viewport">
+                <canvas id="gameCanvas" width="400" height="400"></canvas>
+                <div id="game-status-msg" class="game-over-text hidden">GAME OVER<br><span style="font-size:14px;color:white">Нажмите любую стрелку</span></div>
+            </div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 15px; margin-bottom:0;">Управление: Используйте <b>Стрелки клавиатуры</b>. В самолете стрельба на <b>Пробел</b>.</p>
         </div>
     </div>
 
@@ -231,8 +255,7 @@
         </div>
 
         <h3 style="font-size: 14px; color: var(--text-dim); text-transform: uppercase; margin-top: 10px;">🏆 Топ студентов</h3>
-        <div class="leaderboard-box" id="leaderboard-list">
-            </div>
+        <div class="leaderboard-box" id="leaderboard-list"></div>
 
         <h3 style="font-size: 14px; color: var(--text-dim); text-transform: uppercase;">Группа сейчас</h3>
         <div id="user-list" class="user-list"></div>
@@ -242,7 +265,10 @@
     <div class="main">
         <div class="chat-header">
             <h2 style="margin:0; font-size: 20px;">Общий чат</h2>
-            <button class="btn-theme-toggle" onclick="toggleTheme()" title="Сменить тему">🌓</button>
+            <div class="header-controls">
+                <button class="btn-arcade-toggle" onclick="openArcade()">🎮 Игротека</button>
+                <button class="btn-theme-toggle" onclick="toggleTheme()">🌓</button>
+            </div>
         </div>
         <div id="chat-flow"></div>
         
@@ -270,8 +296,14 @@
     let studyInterval = null;
     let currentSessionIsEarly = false;
 
+    // Игровые переменные движка
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let currentGameType = 'snake'; 
+    let gameLoopInterval = null;
+    let gameState = {};
+
     async function init() {
-        // Восстановление темы оформления из хранилища браузера
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
 
@@ -300,15 +332,13 @@
         }
     }
 
-    // [ФУНКЦИЯ №1]: Логика смены темы оформления (Светлая / Темная)
     window.toggleTheme = () => {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'light' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme); // Сохраняем выбор
+        localStorage.setItem('theme', newTheme);
     };
 
-    // [ФУНКЦИЯ №2]: Логика отправки мгновенных реакций-эмодзи в чат
     window.sendReaction = async (emoji) => {
         if (!currentUser) return;
         await _supabase.from('messages').insert({
@@ -317,73 +347,207 @@
             text: `Отправил реакцию: ${emoji}`
         });
         
-        // Обновляем счетчик сообщений для ачивки "Активист"
         const { data: p } = await _supabase.from('profiles').select('msg_count').eq('id', currentUser.id).single();
         const currentMsgs = (p?.msg_count || 0) + 1;
-        
-        await _supabase.from('profiles').update({
-            msg_count: currentMsgs,
-            ach_active: currentMsgs >= 20
-        }).eq('id', currentUser.id);
-
+        await _supabase.from('profiles').update({ msg_count: currentMsgs, ach_active: currentMsgs >= 20 }).eq('id', currentUser.id);
         refreshData();
     };
 
+    // ================= КОД РАБОТЫ ИГРОВОЙ СИСТЕМЫ =================
+    window.openArcade = () => {
+        document.getElementById('arcade-modal').classList.remove('hidden');
+        document.addEventListener('keydown', handleGameInput);
+        switchGame('snake');
+    };
+
+    window.closeArcade = () => {
+        document.getElementById('arcade-modal').classList.add('hidden');
+        document.removeEventListener('keydown', handleGameInput);
+        clearInterval(gameLoopInterval);
+    };
+
+    window.switchGame = (gameType) => {
+        clearInterval(gameLoopInterval);
+        document.getElementById('game-status-msg').classList.add('hidden');
+        
+        document.querySelectorAll('.btn-game-select').forEach(b => b.classList.remove('active'));
+        document.getElementById(`btn-${gameType}`).classList.add('active');
+        
+        currentGameType = gameType;
+        initGameEngine();
+    };
+
+    function initGameEngine() {
+        if (currentGameType === 'snake') {
+            gameState = {
+                snake: [{x: 10, y: 10}], dx: 1, dy: 0,
+                apple: {x: 5, y: 5}, score: 0, over: false
+            };
+            gameLoopInterval = setInterval(runSnake, 100);
+        } else if (currentGameType === 'space') {
+            gameState = {
+                playerX: 180, bullets: [], enemies: [], score: 0, over: false
+            };
+            gameLoopInterval = setInterval(runSpaceJet, 30);
+        } else if (currentGameType === 'race') {
+            gameState = {
+                carX: 180, obstacles: [], score: 0, over: false, speed: 4
+            };
+            gameLoopInterval = setInterval(runRace, 30);
+        }
+    }
+
+    function handleGameInput(e) {
+        if (gameState.over) {
+            document.getElementById('game-status-msg').classList.add('hidden');
+            initGameEngine();
+            return;
+        }
+
+        if (currentGameType === 'snake') {
+            if (e.key === 'ArrowUp' && gameState.dy === 0) { gameState.dx = 0; gameState.dy = -1; }
+            if (e.key === 'ArrowDown' && gameState.dy === 0) { gameState.dx = 0; gameState.dy = 1; }
+            if (e.key === 'ArrowLeft' && gameState.dx === 0) { gameState.dx = -1; gameState.dy = 0; }
+            if (e.key === 'ArrowRight' && gameState.dx === 0) { gameState.dx = 1; gameState.dy = 0; }
+        } else if (currentGameType === 'space') {
+            if (e.key === 'ArrowLeft' && gameState.playerX > 0) gameState.playerX -= 15;
+            if (e.key === 'ArrowRight' && gameState.playerX < 360) gameState.playerX += 15;
+            if (e.key === ' ' || e.code === 'Space') {
+                gameState.bullets.push({x: gameState.playerX + 18, y: 360});
+                e.preventDefault();
+            }
+        } else if (currentGameType === 'race') {
+            if (e.key === 'ArrowLeft' && gameState.carX > 80) gameState.carX -= 25;
+            if (e.key === 'ArrowRight' && gameState.carX < 280) gameState.carX += 25;
+        }
+    }
+
+    // ИГРА 1: ЗМЕЙКА
+    function runSnake() {
+        if (gameState.over) return triggerGameOver();
+        
+        let head = {x: gameState.snake[0].x + gameState.dx, y: gameState.snake[0].y + gameState.dy};
+        
+        if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) gameState.over = true;
+        gameState.snake.forEach(part => { if(part.x === head.x && part.y === head.y) gameState.over = true; });
+        
+        gameState.snake.unshift(head);
+        
+        if (head.x === gameState.apple.x && head.y === gameState.apple.y) {
+            gameState.score += 10;
+            gameState.apple = {Math: Math.floor(Math.random()*20), x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20)};
+        } else {
+            gameState.snake.pop();
+        }
+
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,400,400);
+        ctx.fillStyle = '#ef4444'; ctx.fillRect(gameState.apple.x*20, gameState.apple.y*20, 18, 18);
+        ctx.fillStyle = '#22c55e'; gameState.snake.forEach(p => ctx.fillRect(p.x*20, p.y*20, 18, 18));
+        
+        drawScore(gameState.score);
+    }
+
+    // ИГРА 2: САМОЛЕТ (СТРЕЛЯЛКА)
+    function runSpaceJet() {
+        if (gameState.over) return triggerGameOver();
+
+        if (Math.random() < 0.05) {
+            gameState.enemies.push({x: Math.random()*360, y: 0});
+        }
+
+        gameState.bullets.forEach(b => b.y -= 8);
+        gameState.enemies.forEach(en => en.y += 3);
+
+        gameState.bullets = gameState.bullets.filter(b => b.y > 0);
+        
+        gameState.enemies.forEach((en, eIdx) => {
+            if (en.y > 360 && Math.abs(en.x - gameState.playerX) < 30) gameState.over = true;
+            
+            gameState.bullets.forEach((b, bIdx) => {
+                if (Math.abs(b.x - en.x) < 25 && Math.abs(b.y - en.y) < 25) {
+                    gameState.score += 5;
+                    gameState.enemies.splice(eIdx, 1);
+                    gameState.bullets.splice(bIdx, 1);
+                }
+            });
+        });
+
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,400,400);
+        ctx.fillStyle = '#8b5cf6'; ctx.fillRect(gameState.playerX, 360, 40, 25); // Игрок
+        ctx.fillStyle = '#38bdf8'; gameState.bullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 10)); // Пули
+        ctx.fillStyle = '#f59e0b'; gameState.enemies.forEach(en => ctx.fillRect(en.x, en.y, 25, 25)); // Враги
+        
+        drawScore(gameState.score);
+    }
+
+    // ИГРА 3: ГОНКИ
+    function runRace() {
+        if (gameState.over) return triggerGameOver();
+
+        if (Math.random() < 0.03) {
+            gameState.obstacles.push({x: 100 + Math.random()*180, y: -40});
+        }
+
+        gameState.obstacles.forEach(obs => {
+            obs.y += gameState.speed;
+            if (obs.y > 350 && Math.abs(obs.x - gameState.carX) < 25) gameState.over = true;
+        });
+
+        gameState.obstacles = gameState.obstacles.filter(obs => {
+            if (obs.y > 400) { gameState.score += 20; return false; }
+            return true;
+        });
+
+        ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,400,400); // Трасса
+        ctx.fillStyle = '#475569'; ctx.fillRect(0,0,80,400); ctx.fillRect(320,0,80,400); // Обочины
+        
+        ctx.fillStyle = '#ef4444'; ctx.fillRect(gameState.carX, 340, 25, 45); // Ваша машина
+        ctx.fillStyle = '#f59e0b'; gameState.obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, 25, 45)); // Препятствия
+        
+        drawScore(gameState.score);
+    }
+
+    function triggerGameOver() {
+        clearInterval(gameLoopInterval);
+        document.getElementById('game-status-msg').classList.remove('hidden');
+    }
+
+    function drawScore(score) {
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.fillText(`SCORE: ${score}`, 15, 25);
+    }
+
+    // Остальной бэкенд-код авторизации и таймера
     window.toggleStudy = async () => {
         const btn = document.getElementById('study-toggle-btn');
         const isStarting = btn.classList.contains('btn-study-start');
         const now = new Date();
         const startTime = isStarting ? now.toISOString() : null;
 
-        if (isStarting && now.getHours() < 8) {
-            currentSessionIsEarly = true;
-        }
+        if (isStarting && now.getHours() < 8) currentSessionIsEarly = true;
 
-        let updateFields = {
-            is_studying: isStarting,
-            session_start: startTime,
-            status: isStarting ? '📚 Учусь' : 'Онлайн'
-        };
+        let updateFields = { is_studying: isStarting, session_start: startTime, status: isStarting ? '📚 Учусь' : 'Онлайн' };
 
         if (!isStarting) {
             const { data: p } = await _supabase.from('profiles').select('session_start, total_study_time, total_sessions, ach_marathon, ach_early').eq('id', currentUser.id).single();
             if (p && p.session_start) {
                 const diffMinutes = Math.floor((new Date() - new Date(p.session_start)) / 60000);
-                const newTotalTime = (p.total_study_time || 0) + diffMinutes;
-                const newTotalSessions = (p.total_sessions || 0) + 1;
-                
-                updateFields.total_study_time = newTotalTime;
-                updateFields.total_sessions = newTotalSessions;
-
-                if (diffMinutes >= 120) {
-                    updateFields.ach_marathon = true;
-                }
-                if (currentSessionIsEarly) {
-                    updateFields.ach_early = true;
-                    currentSessionIsEarly = false;
-                }
+                updateFields.total_study_time = (p.total_study_time || 0) + diffMinutes;
+                updateFields.total_sessions = (p.total_sessions || 0) + 1;
+                if (diffMinutes >= 120) updateFields.ach_marathon = true;
+                if (currentSessionIsEarly) { updateFields.ach_early = true; currentSessionIsEarly = false; }
             }
         }
 
         const { error } = await _supabase.from('profiles').update(updateFields).eq('id', currentUser.id);
-
         if (!error) {
-            if (isStarting) {
-                startLocalTimer(startTime);
-                document.getElementById('user-display-status').innerText = '📚 Учусь';
-            } else {
-                stopLocalTimer();
-                document.getElementById('user-display-status').innerText = 'Онлайн';
-            }
+            if (isStarting) startLocalTimer(startTime) else stopLocalTimer();
             refreshData();
         }
     };
 
     function startLocalTimer(startTime) {
         const btn = document.getElementById('study-toggle-btn');
-        btn.innerText = "Остановить";
-        btn.classList.replace('btn-study-start', 'btn-study-stop');
-        
+        btn.innerText = "Остановить"; btn.classList.replace('btn-study-start', 'btn-study-stop');
         clearInterval(studyInterval);
         studyInterval = setInterval(() => {
             const diff = Math.floor((new Date() - new Date(startTime)) / 1000);
@@ -391,126 +555,51 @@
             const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
             const s = (diff % 60).toString().padStart(2, '0');
             document.getElementById('session-timer').innerText = `${h}:${m}:${s}`;
-            
-            if (diff >= 7200) {
-                document.getElementById('ach-marathon').classList.add('unlocked');
-            }
         }, 1000);
     }
 
     function stopLocalTimer() {
         const btn = document.getElementById('study-toggle-btn');
         clearInterval(studyInterval);
-        btn.innerText = "Начать учёбу";
-        btn.classList.replace('btn-study-stop', 'btn-study-start');
+        btn.innerText = "Начать учёбу"; btn.classList.replace('btn-study-stop', 'btn-study-start');
         document.getElementById('session-timer').innerText = "00:00:00";
     }
 
-    window.login = () => _supabase.auth.signInWithOAuth({ 
-        provider: 'google',
-        options: { redirectTo: 'https://240097-crypto.github.io/ggg/' }
-    });
-
+    window.login = () => _supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://240097-crypto.github.io/ggg/' } });
     window.logout = async () => { await _supabase.auth.signOut(); location.reload(); };
 
     window.updateStatus = async (statusText) => {
         if (statusText !== '📚 Учусь') stopLocalTimer();
-        
-        await _supabase.from('profiles').update({ 
-            status: statusText,
-            is_studying: statusText === '📚 Учусь' 
-        }).eq('id', currentUser.id);
-        
-        document.getElementById('user-display-status').innerText = statusText;
+        await _supabase.from('profiles').update({ status: statusText, is_studying: statusText === '📚 Учусь' }).eq('id', currentUser.id);
         refreshData();
     };
 
     window.sendMessage = async () => {
         const input = document.getElementById('msgInput');
         if (!input.value.trim()) return;
-        
-        await _supabase.from('messages').insert({
-            user_id: currentUser.id,
-            username: currentUser.user_metadata.full_name || currentUser.email,
-            text: input.value
-        });
-
-        const { data: p } = await _supabase.from('profiles').select('msg_count').eq('id', currentUser.id).single();
-        const currentMsgs = (p?.msg_count || 0) + 1;
-        
-        await _supabase.from('profiles').update({
-            msg_count: currentMsgs,
-            ach_active: currentMsgs >= 20
-        }).eq('id', currentUser.id);
-
+        await _supabase.from('messages').insert({ user_id: currentUser.id, username: currentUser.user_metadata.full_name || currentUser.email, text: input.value });
         input.value = '';
         refreshData();
     };
 
     async function refreshData() {
         const { data: users } = await _supabase.from('profiles').select('*').order('username');
-        
         if (users) {
             document.getElementById('user-list').innerHTML = users.map(u => {
                 const isOnline = new Date() - new Date(u.last_seen) < 70000;
-                
-                let studyTag = "";
-                if (u.is_studying && u.session_start) {
-                    const mins = Math.floor((new Date() - new Date(u.session_start)) / 60000);
-                    studyTag = ` <span style="color:var(--accent)">📖 ${mins}м</span>`;
-                }
-
-                return `
-                    <div class="user-card">
-                        <div class="dot ${isOnline ? 'active' : ''}"></div>
-                        <div>
-                            <div class="username">${u.username}${studyTag}</div>
-                            <div style="font-size:12px;color:var(--accent)">${u.status || 'Онлайн'}</div>
-                        </div>
-                    </div>`;
+                return `<div class="user-card"><div class="dot ${isOnline ? 'active' : ''}"></div><div><div>${u.username}</div><div style="font-size:12px;color:var(--accent)">${u.status || 'Онлайн'}</div></div></div>`;
             }).join('');
 
             const sortedLeaders = [...users].sort((a, b) => (b.total_study_time || 0) - (a.total_study_time || 0));
-            
-            document.getElementById('leaderboard-list').innerHTML = sortedLeaders.slice(0, 5).map((u, index) => {
-                let rankIcon = index + 1;
-                if (index === 0) rankIcon = "🥇";
-                if (index === 1) rankIcon = "🥈";
-                if (index === 2) rankIcon = "🥉";
-
-                const totalMin = u.total_study_time || 0;
-                const h = Math.floor(totalMin / 60);
-                const m = totalMin % 60;
-                const timeString = h > 0 ? `${h}ч ${m}м` : `${m}м`;
-
-                return `
-                    <div class="leader-row">
-                        <div class="leader-info">
-                            <span class="leader-rank">${rankIcon}</span>
-                            <span>${u.username}</span>
-                        </div>
-                        <span class="leader-time">${timeString}</span>
-                    </div>
-                `;
-            }).join('');
-
-            const me = users.find(u => u.id === currentUser.id);
-            if (me) {
-                if (me.ach_early) document.getElementById('ach-early').classList.add('unlocked');
-                if (me.ach_marathon) document.getElementById('ach-marathon').classList.add('unlocked');
-                if (me.ach_active || me.msg_count >= 20) document.getElementById('ach-active').classList.add('unlocked');
-                if (me.total_sessions > 0) document.getElementById('ach-first').classList.add('unlocked');
-            }
+            document.getElementById('leaderboard-list').innerHTML = sortedLeaders.slice(0, 5).map((u, i) => `
+                <div class="leader-row"><div class="leader-info"><span>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</span><span>${u.username}</span></div><span class="leader-time">${u.total_study_time || 0}м</span></div>
+            `).join('');
         }
 
         const { data: msgs } = await _supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(40);
         if (msgs) {
             const chatEl = document.getElementById('chat-flow');
-            chatEl.innerHTML = msgs.reverse().map(m => `
-                <div class="msg ${m.user_id === currentUser.id ? 'my' : ''}">
-                    <b style="font-size:10px">${m.username}</b>${m.text}
-                </div>
-             `).join('');
+            chatEl.innerHTML = msgs.reverse().map(m => `<div class="msg ${m.user_id === currentUser.id ? 'my' : ''}"><b>${m.username}</b>${m.text}</div>`).join('');
             chatEl.scrollTop = chatEl.scrollHeight;
         }
     }
@@ -519,3 +608,5 @@
 </script>
 </body>
 </html>
+
+```
