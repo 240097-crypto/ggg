@@ -172,7 +172,10 @@
         <h3 style="margin-top:0; font-size: 14px; color: var(--text-dim); text-transform: uppercase;">Мой профиль</h3>
         <div class="profile-box">
             <div id="user-display-name" style="font-size: 18px; font-weight: 700;">...</div>
-            <div id="user-display-status" style="font-size: 13px; color: var(--accent); margin-top: 5px;">Онлайн</div>
+            <div style="font-size: 13px; color: var(--accent); margin-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+                <span id="user-display-status">Онлайн</span>
+                <span id="user-rank-status" style="color: var(--text-dim); font-weight: 600;">Место: --</span>
+            </div>
             
             <div id="timer-box">
                 <div class="timer-display" id="session-timer">00:00:00</div>
@@ -249,6 +252,35 @@
         }
     }
 
+    // [ФУНКЦИЯ №1]: Определение места текущего пользователя в рейтинге группы
+    async function fetchMyRank() {
+        if (!currentUser) return;
+        const { data: users, error } = await _supabase.from('profiles').select('id, total_study_time');
+        if (!error && users) {
+            // Сортируем список всех пользователей по убыванию учебного времени
+            users.sort((a, b) => (b.total_study_time || 0) - (a.total_study_time || 0));
+            // Находим индекс текущего пользователя в упорядоченном массиве
+            const myIndex = users.findIndex(u => u.id === currentUser.id);
+            if (myIndex !== -1) {
+                document.getElementById('user-rank-status').innerText = `Место: ${myIndex + 1}`;
+            }
+        }
+    }
+
+    // [ФУНКЦИЯ №2]: Проверка условий и моментальное награждение ачивкой "Первый шаг"
+    async function checkAndAwardFirstStep(totalSessions) {
+        if (!currentUser) return;
+        // Если у пользователя завершена ровно одна сессия
+        if (totalSessions === 1) {
+            await _supabase.from('profiles').update({
+                total_sessions: totalSessions
+            }).eq('id', currentUser.id);
+            
+            // Локально подсвечиваем ачивку для мгновенного фидбека
+            document.getElementById('ach-first').classList.add('unlocked');
+        }
+    }
+
     // Внедренная функция таймера
     window.toggleStudy = async () => {
         const btn = document.getElementById('study-toggle-btn');
@@ -287,6 +319,9 @@
                     updateFields.ach_early = true;
                     currentSessionIsEarly = false;
                 }
+
+                // Вызов функции №2 для проверки ачивки "Первый шаг"
+                await checkAndAwardFirstStep(newTotalSessions);
             }
         }
 
@@ -380,6 +415,9 @@
         const { data: users } = await _supabase.from('profiles').select('*').order('username');
         
         if (users) {
+            // Вызов функции №1 при каждом цикле обновления
+            fetchMyRank();
+
             // 1. Рендеринг списка "Группа сейчас"
             document.getElementById('user-list').innerHTML = users.map(u => {
                 const isOnline = new Date() - new Date(u.last_seen) < 70000;
@@ -401,7 +439,6 @@
             }).join('');
 
             // 2. Рендеринг блока "🏆 Топ студентов"
-            // Сортируем копию массива по total_study_time (по убыванию)
             const sortedLeaders = [...users].sort((a, b) => (b.total_study_time || 0) - (a.total_study_time || 0));
             
             document.getElementById('leaderboard-list').innerHTML = sortedLeaders.slice(0, 5).map((u, index) => {
