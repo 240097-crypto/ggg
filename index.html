@@ -1,16 +1,3 @@
-Идея шикарная! Такая игротека прямо внутри дашборда — отличный способ «выпустить пар» в перерывах между учебными сессиями.
-
-Я полностью обновил ваш код. Логика смены темы и реакций осталась на месте. Теперь в панели чата появилась новая кнопка **«🎮 Игротека»**. При нажатии на неё открывается красивое модальное окно, где вы можете выбрать и сразу запустить одну из трёх игр:
-
-1. 🐍 **Змейка** (управление стрелками клавиатуры).
-2. 🚀 **Космический истребитель** (стрелки — движение, Space — стрельба по метеоритам).
-3. 🏎️ **Гонки** (стрелки «Влево»/«Вправо» для уклонения от встречных машин).
-
----
-
-### Полный обновленный код для вашего GitHub
-
-```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -435,7 +422,7 @@
         
         if (head.x === gameState.apple.x && head.y === gameState.apple.y) {
             gameState.score += 10;
-            gameState.apple = {Math: Math.floor(Math.random()*20), x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20)};
+            gameState.apple = { x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20) };
         } else {
             gameState.snake.pop();
         }
@@ -473,9 +460,9 @@
         });
 
         ctx.fillStyle = '#000'; ctx.fillRect(0,0,400,400);
-        ctx.fillStyle = '#8b5cf6'; ctx.fillRect(gameState.playerX, 360, 40, 25); // Игрок
-        ctx.fillStyle = '#38bdf8'; gameState.bullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 10)); // Пули
-        ctx.fillStyle = '#f59e0b'; gameState.enemies.forEach(en => ctx.fillRect(en.x, en.y, 25, 25)); // Враги
+        ctx.fillStyle = '#8b5cf6'; ctx.fillRect(gameState.playerX, 360, 40, 25);
+        ctx.fillStyle = '#38bdf8'; gameState.bullets.forEach(b => ctx.fillRect(b.x, b.y, 4, 10));
+        ctx.fillStyle = '#f59e0b'; gameState.enemies.forEach(en => ctx.fillRect(en.x, en.y, 25, 25));
         
         drawScore(gameState.score);
     }
@@ -498,11 +485,11 @@
             return true;
         });
 
-        ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,400,400); // Трасса
-        ctx.fillStyle = '#475569'; ctx.fillRect(0,0,80,400); ctx.fillRect(320,0,80,400); // Обочины
+        ctx.fillStyle = '#1e293b'; ctx.fillRect(0,0,400,400);
+        ctx.fillStyle = '#475569'; ctx.fillRect(0,0,80,400); ctx.fillRect(320,0,80,400);
         
-        ctx.fillStyle = '#ef4444'; ctx.fillRect(gameState.carX, 340, 25, 45); // Ваша машина
-        ctx.fillStyle = '#f59e0b'; gameState.obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, 25, 45)); // Препятствия
+        ctx.fillStyle = '#ef4444'; ctx.fillRect(gameState.carX, 340, 25, 45);
+        ctx.fillStyle = '#f59e0b'; gameState.obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, 25, 45));
         
         drawScore(gameState.score);
     }
@@ -516,7 +503,7 @@
         ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.fillText(`SCORE: ${score}`, 15, 25);
     }
 
-    // Остальной бэкенд-код авторизации и таймера
+    // Модуль таймера учебы и сессий
     window.toggleStudy = async () => {
         const btn = document.getElementById('study-toggle-btn');
         const isStarting = btn.classList.contains('btn-study-start');
@@ -540,7 +527,11 @@
 
         const { error } = await _supabase.from('profiles').update(updateFields).eq('id', currentUser.id);
         if (!error) {
-            if (isStarting) startLocalTimer(startTime) else stopLocalTimer();
+            if (isStarting) { 
+                startLocalTimer(startTime); 
+            } else { 
+                stopLocalTimer(); 
+            }
             refreshData();
         }
     };
