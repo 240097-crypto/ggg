@@ -24,11 +24,12 @@
         .sidebar { 
             width: 300px; background: #0b0f1a; border-right: 1px solid #1e293b;
             display: flex; flex-direction: column; padding: 24px; flex-shrink: 0;
+            overflow-y: auto;
         }
 
         .profile-box { 
             background: var(--bg-panel); border-radius: 16px; padding: 20px; 
-            margin-bottom: 30px; border: 1px solid #334155;
+            margin-bottom: 20px; border: 1px solid #334155;
         }
 
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
@@ -60,14 +61,83 @@
         .btn-study-start { background: var(--online); color: white; }
         .btn-study-stop { background: #ef4444; color: white; }
 
-        .user-list { flex-grow: 1; overflow-y: auto; }
+        .user-list { margin-bottom: 20px; }
         .user-card { 
             display: flex; align-items: center; gap: 12px; padding: 12px; 
-            border-radius: 10px; margin-bottom: 4px; transition: 0.2s;
+            border-radius: 10px; margin-bottom: 4px; transition: 0.2s; background: rgba(30, 41, 59, 0.3);
         }
         
         .dot { width: 10px; height: 10px; border-radius: 50%; background: #475569; position: relative; }
         .dot.active { background: var(--online); box-shadow: 0 0 10px var(--online); }
+
+        /* Стили рейтинга и достижений */
+        .leaderboard-box {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #1e293b;
+            margin-bottom: 20px;
+        }
+        .leader-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #1e293b;
+            font-size: 13px;
+        }
+        .leader-row:last-child { border-bottom: none; }
+        .leader-info { display: flex; align-items: center; gap: 8px; }
+        .leader-rank { font-weight: bold; min-width: 20px; color: var(--text-dim); }
+        .leader-time { color: var(--online); font-weight: 600; font-size: 12px; }
+
+        .achievements-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .ach-badge {
+            background: #334155;
+            border-radius: 6px;
+            padding: 6px 4px;
+            text-align: center;
+            font-size: 16px;
+            position: relative;
+            cursor: help;
+            opacity: 0.3;
+            filter: grayscale(100%);
+            transition: 0.3s;
+        }
+        .ach-badge.unlocked {
+            opacity: 1;
+            filter: grayscale(0%);
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--accent);
+        }
+        .ach-badge .tooltip {
+            visibility: hidden;
+            width: 140px;
+            background-color: #0b0f1a;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 10px;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .ach-badge:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
 
         .main { flex-grow: 1; display: flex; flex-direction: column; }
         .chat-header { padding: 20px 40px; background: #0b0f1a; border-bottom: 1px solid #1e293b; }
@@ -115,10 +185,22 @@
                 <button class="btn-status" onclick="updateStatus('🎮 В игре')">🎮 В игре</button>
                 <button class="btn-status" onclick="updateStatus('😴 Сплю')">😴 Сплю</button>
             </div>
+
+            <div class="achievements-row" id="my-achievements">
+                <div class="ach-badge" id="ach-early"><span class="tooltip"><b>Ранняя пташка</b><br>Зашёл на учёбу до 8:00</span>🌅</div>
+                <div class="ach-badge" id="ach-marathon"><span class="tooltip"><b>Марафонец</b><br>Учёба более 2 часов подряд</span>🏃‍♂️</div>
+                <div class="ach-badge" id="ach-active"><span class="tooltip"><b>Активист</b><br>Написал более 20 сообщений</span>💬</div>
+                <div class="ach-badge" id="ach-first"><span class="tooltip"><b>Первый шаг</b><br>Завершил первую сессию</span>🎓</div>
+            </div>
         </div>
+
+        <h3 style="font-size: 14px; color: var(--text-dim); text-transform: uppercase; margin-top: 10px;">🏆 Топ студентов</h3>
+        <div class="leaderboard-box" id="leaderboard-list">
+            </div>
+
         <h3 style="font-size: 14px; color: var(--text-dim); text-transform: uppercase;">Группа сейчас</h3>
         <div id="user-list" class="user-list"></div>
-        <button onclick="logout()" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:12px; margin-top: 20px; text-decoration: underline;">Выйти</button>
+        <button onclick="logout()" style="background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:12px; margin-top: auto; text-decoration: underline; padding-bottom: 10px;">Выйти</button>
     </div>
 
     <div class="main">
@@ -137,6 +219,7 @@
 
     let currentUser = null;
     let studyInterval = null;
+    let currentSessionIsEarly = false; // Маркер для ачивки "Ранняя пташка"
 
     async function init() {
         const { data: { session } } = await _supabase.auth.getSession();
@@ -146,6 +229,7 @@
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('user-display-name').innerText = currentUser.user_metadata.full_name || currentUser.email;
 
+            // Инициализация профиля с базовыми полями аналитики, если их нет
             await _supabase.from('profiles').upsert({ 
                 id: currentUser.id, 
                 username: currentUser.user_metadata.full_name || currentUser.email 
@@ -169,13 +253,44 @@
     window.toggleStudy = async () => {
         const btn = document.getElementById('study-toggle-btn');
         const isStarting = btn.classList.contains('btn-study-start');
-        const startTime = isStarting ? new Date().toISOString() : null;
+        const now = new Date();
+        const startTime = isStarting ? now.toISOString() : null;
 
-        const { error } = await _supabase.from('profiles').update({
+        // Логика ачивки: Ранняя пташка (запуск до 8 утра)
+        if (isStarting && now.getHours() < 8) {
+            currentSessionIsEarly = true;
+        }
+
+        let updateFields = {
             is_studying: isStarting,
             session_start: startTime,
             status: isStarting ? '📚 Учусь' : 'Онлайн'
-        }).eq('id', currentUser.id);
+        };
+
+        // Если останавливаем учебу, сохраняем агрегированную метрику времени
+        if (!isStarting) {
+            const { data: p } = await _supabase.from('profiles').select('session_start, total_study_time, total_sessions, ach_marathon, ach_early').eq('id', currentUser.id).single();
+            if (p && p.session_start) {
+                const diffMinutes = Math.floor((new Date() - new Date(p.session_start)) / 60000);
+                const newTotalTime = (p.total_study_time || 0) + diffMinutes;
+                const newTotalSessions = (p.total_sessions || 0) + 1;
+                
+                updateFields.total_study_time = newTotalTime;
+                updateFields.total_sessions = newTotalSessions;
+
+                // Проверка на ачивку "Марафонец" (учёба более 2 часов = 120 минут непрерывно)
+                if (diffMinutes >= 120) {
+                    updateFields.ach_marathon = true;
+                }
+                // Запись рекорда ранней пташки
+                if (currentSessionIsEarly) {
+                    updateFields.ach_early = true;
+                    currentSessionIsEarly = false;
+                }
+            }
+        }
+
+        const { error } = await _supabase.from('profiles').update(updateFields).eq('id', currentUser.id);
 
         if (!error) {
             if (isStarting) {
@@ -201,6 +316,11 @@
             const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
             const s = (diff % 60).toString().padStart(2, '0');
             document.getElementById('session-timer').innerText = `${h}:${m}:${s}`;
+            
+            // Если прямо во время текущей сессии набежало 2 часа, подсветим локально
+            if (diff >= 7200) {
+                document.getElementById('ach-marathon').classList.add('unlocked');
+            }
         }, 1000);
     }
 
@@ -220,7 +340,6 @@
     window.logout = async () => { await _supabase.auth.signOut(); location.reload(); };
 
     window.updateStatus = async (statusText) => {
-        // Если выбираем статус вручную, останавливаем таймер если он шел (по желанию)
         if (statusText !== '📚 Учусь') stopLocalTimer();
         
         await _supabase.from('profiles').update({ 
@@ -235,22 +354,36 @@
     window.sendMessage = async () => {
         const input = document.getElementById('msgInput');
         if (!input.value.trim()) return;
+        
+        // Отправляем сообщение
         await _supabase.from('messages').insert({
             user_id: currentUser.id,
             username: currentUser.user_metadata.full_name || currentUser.email,
             text: input.value
         });
+
+        // Инкрементируем счетчик сообщений пользователя для ачивки "Активист"
+        const { data: p } = await _supabase.from('profiles').select('msg_count').eq('id', currentUser.id).single();
+        const currentMsgs = (p?.msg_count || 0) + 1;
+        
+        await _supabase.from('profiles').update({
+            msg_count: currentMsgs,
+            ach_active: currentMsgs >= 20
+        }).eq('id', currentUser.id);
+
         input.value = '';
         refreshData();
     };
 
     async function refreshData() {
+        // Запрос пользователей с сортировкой по времени учебы для ТОПа
         const { data: users } = await _supabase.from('profiles').select('*').order('username');
+        
         if (users) {
+            // 1. Рендеринг списка "Группа сейчас"
             document.getElementById('user-list').innerHTML = users.map(u => {
                 const isOnline = new Date() - new Date(u.last_seen) < 70000;
                 
-                // Доп. метка если юзер учится
                 let studyTag = "";
                 if (u.is_studying && u.session_start) {
                     const mins = Math.floor((new Date() - new Date(u.session_start)) / 60000);
@@ -266,8 +399,44 @@
                         </div>
                     </div>`;
             }).join('');
+
+            // 2. Рендеринг блока "🏆 Топ студентов"
+            // Сортируем копию массива по total_study_time (по убыванию)
+            const sortedLeaders = [...users].sort((a, b) => (b.total_study_time || 0) - (a.total_study_time || 0));
+            
+            document.getElementById('leaderboard-list').innerHTML = sortedLeaders.slice(0, 5).map((u, index) => {
+                let rankIcon = index + 1;
+                if (index === 0) rankIcon = "🥇";
+                if (index === 1) rankIcon = "🥈";
+                if (index === 2) rankIcon = "🥉";
+
+                const totalMin = u.total_study_time || 0;
+                const h = Math.floor(totalMin / 60);
+                const m = totalMin % 60;
+                const timeString = h > 0 ? `${h}ч ${m}м` : `${m}м`;
+
+                return `
+                    <div class="leader-row">
+                        <div class="leader-info">
+                            <span class="leader-rank">${rankIcon}</span>
+                            <span>${u.username}</span>
+                        </div>
+                        <span class="leader-time">${timeString}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // 3. Обновление состояния достижений текущего пользователя на панели
+            const me = users.find(u => u.id === currentUser.id);
+            if (me) {
+                if (me.ach_early) document.getElementById('ach-early').classList.add('unlocked');
+                if (me.ach_marathon) document.getElementById('ach-marathon').classList.add('unlocked');
+                if (me.ach_active || me.msg_count >= 20) document.getElementById('ach-active').classList.add('unlocked');
+                if (me.total_sessions > 0) document.getElementById('ach-first').classList.add('unlocked');
+            }
         }
 
+        // Рендеринг чата
         const { data: msgs } = await _supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(40);
         if (msgs) {
             const chatEl = document.getElementById('chat-flow');
@@ -275,7 +444,7 @@
                 <div class="msg ${m.user_id === currentUser.id ? 'my' : ''}">
                     <b style="font-size:10px">${m.username}</b>${m.text}
                 </div>
-            `).join('');
+             `).join('');
             chatEl.scrollTop = chatEl.scrollHeight;
         }
     }
